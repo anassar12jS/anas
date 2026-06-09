@@ -1,0 +1,6 @@
+{
+  "name": "Geo-OSINT Photo Finder",
+  "description": "Upload a photo of a random place, pin your guess on the world map, and compare your geographical deduction with our advanced Rainbolt-style AI reasoning using real OSINT visual hints.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
