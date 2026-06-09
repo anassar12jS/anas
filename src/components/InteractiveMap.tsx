@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import L from "leaflet";
+import { Map, Globe, Mountain } from "lucide-react";
 
 interface InteractiveMapProps {
   userGuess: { lat: number; lng: number } | null;
@@ -20,7 +21,11 @@ export default function InteractiveMap({
   const actualMarkerRef = useRef<L.Marker | null>(null);
   const polylineRef = useRef<L.Polyline | null>(null);
 
-  // Initialize leafet map once
+  const [mapInitialized, setMapInitialized] = useState(false);
+  const [currentLayerType, setCurrentLayerType] = useState<"dark" | "satellite" | "topo">("dark");
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+
+  // Initialize leaflet map once
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
@@ -34,12 +39,8 @@ export default function InteractiveMap({
       attributionControl: false,
     });
 
-    // Add elegant Dark Matter tile layer which looks premium
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 20,
-    }).addTo(map);
-
     mapRef.current = map;
+    setMapInitialized(true);
 
     // Handle map clicks
     map.on("click", (e: L.LeafletMouseEvent) => {
@@ -51,9 +52,43 @@ export default function InteractiveMap({
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
+        setMapInitialized(false);
       }
     };
   }, [disabled, onPlaceGuess]);
+
+  // Handle tile layer updates and swaps based on user selection state
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapInitialized) return;
+
+    // Remove old layer first to avoid piling tiles over each other.
+    if (tileLayerRef.current) {
+      tileLayerRef.current.remove();
+      tileLayerRef.current = null;
+    }
+
+    let url = "";
+    let attribution = "";
+    let maxZoom = 20;
+
+    if (currentLayerType === "satellite") {
+      url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+      attribution = "Esri Satellite";
+    } else if (currentLayerType === "topo") {
+      url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}";
+      attribution = "Esri Topography";
+    } else {
+      url = "https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png";
+      attribution = "&copy; CARTO";
+    }
+
+    tileLayerRef.current = L.tileLayer(url, {
+      maxZoom,
+      attribution,
+    }).addTo(map);
+
+  }, [mapInitialized, currentLayerType]);
 
   // Sync disabled state of map clicks
   useEffect(() => {
@@ -158,6 +193,50 @@ export default function InteractiveMap({
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-[#222] shadow-xl min-h-[350px]">
       <div ref={mapContainerRef} className="w-full h-full" id="guess-map" />
+
+      {/* Dynamic Map Layer Toggle Console */}
+      <div className="absolute top-3 right-3 z-[1000] flex flex-col items-end gap-1.5" id="layer-selector">
+        <div className="flex bg-[#0a0a0a]/95 backdrop-blur-md border border-[#222] p-1 rounded-md shadow-2xl items-center gap-1">
+          <button
+            onClick={() => setCurrentLayerType("dark")}
+            className={`px-2.5 py-1.5 rounded-sm text-[9px] font-mono tracking-wider transition-all uppercase flex items-center gap-1.5 cursor-pointer select-none ${
+              currentLayerType === "dark"
+                ? "bg-[#f27d26] text-black font-black shadow-[0_0_8px_rgba(242,125,38,0.35)]"
+                : "text-[#888] hover:text-[#e0e0e0] hover:bg-[#151515]"
+            }`}
+            title="Switch to Dark-mode Street Map view"
+          >
+            <Map className="w-3 h-3" />
+            <span className="hidden sm:inline">Dark Street</span>
+          </button>
+          
+          <button
+            onClick={() => setCurrentLayerType("satellite")}
+            className={`px-2.5 py-1.5 rounded-sm text-[9px] font-mono tracking-wider transition-all uppercase flex items-center gap-1.5 cursor-pointer select-none ${
+              currentLayerType === "satellite"
+                ? "bg-[#f27d26] text-black font-black shadow-[0_0_8px_rgba(242,125,38,0.35)]"
+                : "text-[#888] hover:text-[#e0e0e0] hover:bg-[#151515]"
+            }`}
+            title="Switch to Esri Satellite Imagery"
+          >
+            <Globe className="w-3 h-3" />
+            <span className="hidden sm:inline">Satellite</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentLayerType("topo")}
+            className={`px-2.5 py-1.5 rounded-sm text-[9px] font-mono tracking-wider transition-all uppercase flex items-center gap-1.5 cursor-pointer select-none ${
+              currentLayerType === "topo"
+                ? "bg-[#f27d26] text-black font-black shadow-[0_0_8px_rgba(242,125,38,0.35)]"
+                : "text-[#888] hover:text-[#e0e0e0] hover:bg-[#151515]"
+            }`}
+            title="Switch to Esri Topographical Map"
+          >
+            <Mountain className="w-3 h-3" />
+            <span className="hidden sm:inline">Topographic</span>
+          </button>
+        </div>
+      </div>
       
       {!userGuess && !actualLocation && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-[#0a0a0a]/95 border border-[#333] text-[#e0e0e0] py-1.5 px-3.5 rounded-md text-xs font-medium tracking-tight pointer-events-none shadow-2xl z-[1000] flex items-center gap-2">
